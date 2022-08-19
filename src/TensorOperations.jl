@@ -86,7 +86,31 @@ function memsize end
 function similar_from_indices end
 function similarstructure_from_indices end
 
-taskid() = convert(UInt, pointer_from_objref(current_task()))
+using Base.Threads;
+
+
+const UUIDS::Channel{UInt} = Channel{UInt}(nthreads());
+foreach(x->push!(UUIDS,x),1:nthreads())
+
+function register_task()
+    if haskey(task_local_storage(),"TensorOperations.UUID")
+        @warn "double registration?"
+    else
+        id = take!(UUIDS);
+        task_local_storage()["TensorOperations.UUID"] = id
+    end
+    nothing
+end
+
+function unregister_task()
+    id = task_local_storage()["TensorOperations.UUID"];
+    delete!(task_local_storage(),"TensorOperations.UUID");
+    push!(UUIDS,id);
+    nothing
+end
+
+taskid() = convert(UInt, task_local_storage("TensorOperations.UUID"))
+
 
 const cache = LRU{Any, Any}(; by = memsize, maxsize = default_cache_size())
 

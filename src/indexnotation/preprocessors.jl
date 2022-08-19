@@ -1,3 +1,10 @@
+function taskreg(ex)
+    quote
+        register_task()
+        $(ex)
+    end
+end
+
 # replace all indices by a function of that index
 function replaceindices((@nospecialize f), ex::Expr)
     if istensor(ex)

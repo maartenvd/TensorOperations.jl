@@ -1,3 +1,10 @@
+function taskunreg(ex)
+    quote
+        $(ex)
+        unregister_task()
+    end
+end
+
 function _flatten(ex::Expr)
     head = ex.head
     args = _flatten.(ex.args)
@@ -37,7 +44,7 @@ removelinenumbernode(ex) = ex
 const tensoroperationsfunctions = (:similar_from_indices,
                                     :cached_similar_from_indices,
                                     :add!, :trace!, :contract!,
-                                    :scalar, :IndexError)
+                                    :scalar, :IndexError, :register_task, :unregister_task)
 function addtensoroperations(ex::Expr)
     if ex.head == :call && ex.args[1] in tensoroperationsfunctions
         return Expr(ex.head, GlobalRef(TensorOperations, ex.args[1]),

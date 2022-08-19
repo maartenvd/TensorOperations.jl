@@ -61,6 +61,8 @@ function ncon(tensors, network,
     else
         syma = symb = nothing
     end
+    register_task();
+
     A, IA, CA = contracttree(tensors, network, conjlist, tree[1], syma)
     B, IB, CB = contracttree(tensors, network, conjlist, tree[2], symb)
     IC = tuple(output...)
@@ -76,6 +78,7 @@ function ncon(tensors, network,
     end
     contract!(true, A, CA, B, CB, false, C,
                 oindA, cindA, oindB, cindB, indCinoAB, (), symcontract)
+    unregister_task();
     return C
 end
 
