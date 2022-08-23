@@ -5,14 +5,13 @@ mutable struct TensorParser
 
     postprocessors::Vector{Any}
     function TensorParser()
-        preprocessors = [taskreg,normalizeindices,
+        preprocessors = [normalizeindices,
                             expandconj,
                             nconindexcompletion,
-                            taskunreg,
                             extracttensorobjects]
         contractiontreebuilder = defaulttreebuilder
         contractiontreesorter = defaulttreesorter
-        postprocessors = [_flatten, removelinenumbernode, addtensoroperations]
+        postprocessors = [_flatten, removelinenumbernode, taskreg,addtensoroperations]
         return new(preprocessors,
                     contractiontreebuilder,
                     contractiontreesorter,

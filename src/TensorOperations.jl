@@ -87,25 +87,38 @@ function similar_from_indices end
 function similarstructure_from_indices end
 
 using Base.Threads;
-
-
-const UUIDS::Channel{UInt} = Channel{UInt}(nthreads());
-foreach(x->push!(UUIDS,x),1:nthreads())
+using ConcurrentCollections
+numtasks::Atomic{UInt} = Atomic{UInt}(1);
+const UUIDS = ConcurrentStack{UInt}();
 
 function register_task()
     if haskey(task_local_storage(),"TensorOperations.UUID")
-        @warn "double registration?"
+        task_local_storage()["TensorOperations.level"] += 1
     else
-        id = take!(UUIDS);
+        
+        maybeid = maybepop!(UUIDS);
+        if isnothing(maybeid)
+
+            id = Base.Threads.atomic_add!(numtasks,UInt(1));
+        else
+            id = something(maybeid)
+        end
+
         task_local_storage()["TensorOperations.UUID"] = id
+        task_local_storage()["TensorOperations.level"] = 1
     end
     nothing
 end
 
 function unregister_task()
     id = task_local_storage()["TensorOperations.UUID"];
-    delete!(task_local_storage(),"TensorOperations.UUID");
-    push!(UUIDS,id);
+    
+    task_local_storage()["TensorOperations.level"] -= 1
+
+    if task_local_storage()["TensorOperations.level"] == 0
+        delete!(task_local_storage(),"TensorOperations.UUID");
+        push!(UUIDS,id);
+    end
     nothing
 end
 

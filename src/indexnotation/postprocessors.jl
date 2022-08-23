@@ -1,10 +1,12 @@
-function taskunreg(ex)
+function taskreg(ex)
+    s = gensym()
     quote
-        $(ex)
+        register_task()
+        $(s) = $(ex)
         unregister_task()
+        $(s)
     end
 end
-
 function _flatten(ex::Expr)
     head = ex.head
     args = _flatten.(ex.args)
