@@ -269,6 +269,9 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
         throw(DimensionMismatch("non-matching sizes in uncontracted dimensions"))
 
     if use_blas() && TC <: BlasFloat
+        cleanup_A2 = false;
+        cleanup_B2 = false;
+        cleanup_C2 = false;
         if isblascontractable(A, oindA, cindA, CA) && eltype(A) == TC
             A2 = A
             CA2 = CA
@@ -276,7 +279,8 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
             if syms === nothing
                 A2 = similar_from_indices(TC, oindA, cindA, A, CA)
             else
-                A2 = cached_similar_from_indices(syms[1], TC, oindA, cindA, A, CA)
+                cleanup_A2 = true;
+                A2 = allocate_similar_from_indices(current_strategy(),syms[1], TC, oindA, cindA, A, CA)
             end
             add!(1, A, CA, 0, A2, oindA, cindA)
             CA2 = :N
@@ -290,7 +294,8 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
             if syms === nothing
                 B2 = similar_from_indices(TC, cindB, oindB, B, CB)
             else
-                B2 = cached_similar_from_indices(syms[2], TC, cindB, oindB, B, CB)
+                cleanup_B2 = true;
+                B2 = allocate_similar_from_indices(current_strategy(),syms[2], TC, cindB, oindB, B, CB)
             end
             add!(1, B, CB, 0, B2, cindB, oindB)
             CB2 = :N
@@ -309,7 +314,8 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
             if syms === nothing
                 C2 = similar_from_indices(TC, oindAinC, oindBinC, C, :N)
             else
-                C2 = cached_similar_from_indices(syms[3], TC, oindAinC, oindBinC, C, :N)
+                cleanup_C2 = true;
+                C2 = allocate_similar_from_indices(current_strategy(),syms[3], TC, oindAinC, oindBinC, C, :N)
             end
             _blas_contract!(1, A2, CA2, B2, CB2, 0, C2,
                                 oindA, cindA, oindB, cindB,
@@ -318,10 +324,15 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
 
             add!(α, C2, :N, β, C, indCinoAB, ())
         end
+
+        cleanup_A2 && deallocate!(current_strategy(),A2)
+        cleanup_B2 && deallocate!(current_strategy(),B2)
+        cleanup_C2 && deallocate!(current_strategy(),C2)
     else
         _native_contract!(α, A, CA, B, CB, β, C, oindA, cindA, oindB, cindB, indCinoAB,
                             osizeA, csizeA, osizeB, csizeB)
     end
+
     return C
 end
 

@@ -37,7 +37,7 @@ removelinenumbernode(ex) = ex
 const tensoroperationsfunctions = (:similar_from_indices,
                                     :allocate_similar_from_indices,
                                     :add!, :trace!, :contract!, :deallocate!,
-                                    :scalar, :IndexError)
+                                    :scalar, :IndexError, :current_strategy)
 function addtensoroperations(ex::Expr)
     if ex.head == :call && ex.args[1] in tensoroperationsfunctions
         return Expr(ex.head, GlobalRef(TensorOperations, ex.args[1]),

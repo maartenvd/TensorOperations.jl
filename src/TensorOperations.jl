@@ -14,7 +14,7 @@ using Requires
 export @tensor, @tensoropt, @tensoropt_verbose, @optimalcontractiontree, @notensor, @ncon
 export @cutensor
 
-export enable_blas, disable_blas, enable_cache, disable_cache, clear_cache, cachesize
+export enable_blas, disable_blas, enable_cache, clear_cache, cachesize
 
 # export function based API
 export ncon
@@ -73,75 +73,6 @@ function enable_blas()
     _use_blas[] = true
     return
 end
-
-# Find better names?
-@enum TemporaryStrategy JULIA_MANAGED_TEMPORARIES=1 CACHED_TEMPORARIES=2 MALLOC_TEMPORARIES=3
-const _temporary_strategy = Ref(CACHED_TEMPORARIES);
-
-use_cache() = _temporary_strategy[] == CACHED_TEMPORARIES;
-
-function default_cache_size()
-    return min(1<<32, Int(Sys.total_memory())>>2)
-end
-
-# methods used for the cache: see implementation/tensorcache.jl for more info
-function memsize end
-function similar_from_indices end
-function similarstructure_from_indices end
-
-taskid() = convert(UInt, pointer_from_objref(current_task()))
-
-const cache = LRU{Any, Any}(; by = memsize, maxsize = default_cache_size())
-
-"""
-    disable_cache()
-
-Disable the cache for further use but does not clear its current contents.
-Also see [`clear_cache()`](@ref)
-"""
-function disable_cache()
-    @assert false # just not really defined anymore?
-    @assert _temporary_strategy[] == CACHED_TEMPORARIES;
-    _use_cache[] = false
-    return
-end
-
-"""
-    enable_cache(; maxsize::Int = ..., maxrelsize::Real = ...)
-
-(Re)-enable the cache for further use; set the maximal size `maxsize` (as number of bytes)
-or relative size `maxrelsize`, as a fraction between 0 and 1, resulting in
-`maxsize = floor(Int, maxrelsize * Sys.total_memory())`. Default value is `maxsize = 2^30` bytes, which amounts to 1 gigabyte of memory.
-"""
-function enable_cache(; maxsize::Int = -1, maxrelsize::Real = 0.0)
-    if maxsize == -1 && maxrelsize == 0.0
-        maxsize = default_cache_size()
-    elseif maxrelsize > 0
-        maxsize = max(maxsize, floor(Int, maxrelsize*Sys.total_memory()))
-    else
-        @assert maxsize >= 0
-    end
-    _temporary_strategy[] = CACHED_TEMPORARIES;
-    resize!(cache; maxsize = maxsize)
-    return
-end
-
-"""
-    clear_cache()
-
-Clear the current contents of the cache.
-"""
-function clear_cache()
-    empty!(cache)
-    return
-end
-
-"""
-    cachesize()
-
-Return the current memory size (in bytes) of all the objects in the cache.
-"""
-cachesize() = cache.currentsize
 
 # Initialization
 #-----------------
@@ -221,7 +152,6 @@ function _precompile_()
     @assert precompile(Tuple{typeof(instantiate_scalar), Expr})
     @assert precompile(Tuple{typeof(instantiate_scalar), Float64})
     @assert precompile(Tuple{typeof(disable_blas)})
-    @assert precompile(Tuple{typeof(disable_cache)})
     @assert precompile(Tuple{typeof(enable_blas)})
     @assert precompile(Tuple{typeof(enable_cache)})
     @assert precompile(Tuple{typeof(expandconj), Expr})
