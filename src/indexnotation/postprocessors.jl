@@ -35,8 +35,8 @@ end
 removelinenumbernode(ex) = ex
 
 const tensoroperationsfunctions = (:similar_from_indices,
-                                    :cached_similar_from_indices,
-                                    :add!, :trace!, :contract!,
+                                    :allocate_similar_from_indices,
+                                    :add!, :trace!, :contract!, :deallocate!,
                                     :scalar, :IndexError)
 function addtensoroperations(ex::Expr)
     if ex.head == :call && ex.args[1] in tensoroperationsfunctions

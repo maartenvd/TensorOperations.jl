@@ -44,6 +44,7 @@ include("indexnotation/optdata.jl")
 include("indexnotation/optimaltree.jl")
 include("indexnotation/tensormacros.jl")
 include("indexnotation/indexordertree.jl")
+include("indexnotation/allocators.jl")
 @specialize
 
 # Implementations
@@ -73,9 +74,11 @@ function enable_blas()
     return
 end
 
-# A cache for temporaries of tensor contractions
-const _use_cache = Ref(true)
-use_cache() = _use_cache[]
+# Find better names?
+@enum TemporaryStrategy JULIA_MANAGED_TEMPORARIES=1 CACHED_TEMPORARIES=2 MALLOC_TEMPORARIES=3
+const _temporary_strategy = Ref(CACHED_TEMPORARIES);
+
+use_cache() = _temporary_strategy[] == CACHED_TEMPORARIES;
 
 function default_cache_size()
     return min(1<<32, Int(Sys.total_memory())>>2)
@@ -97,6 +100,8 @@ Disable the cache for further use but does not clear its current contents.
 Also see [`clear_cache()`](@ref)
 """
 function disable_cache()
+    @assert false # just not really defined anymore?
+    @assert _temporary_strategy[] == CACHED_TEMPORARIES;
     _use_cache[] = false
     return
 end
@@ -116,7 +121,7 @@ function enable_cache(; maxsize::Int = -1, maxrelsize::Real = 0.0)
     else
         @assert maxsize >= 0
     end
-    _use_cache[] = true
+    _temporary_strategy[] = CACHED_TEMPORARIES;
     resize!(cache; maxsize = maxsize)
     return
 end

@@ -22,7 +22,17 @@ instantiate_eltype(ex) = Expr(:call, :typeof, ex)
 function instantiate_scalar(ex::Expr)
     if ex.head == :call && ex.args[1] == :scalar
         @assert length(ex.args) == 2 && istensorexpr(ex.args[2])
-        return :(scalar($(instantiate(nothing, 0, ex.args[2], 1, [], [], true))))
+
+        
+        tempvar = gensym();
+        retvar = gensym();
+        return quote
+            $(tempvar) = instantiate(nothing, 0, $(ex.args[2]), 1, [], [], true);
+            $(retvar) = scalar(tempvar);
+            deallocate!($(tempvar))
+            $(retvar)
+        end
+
     elseif ex.head == :call
         return Expr(ex.head, ex.args[1], map(instantiate_scalar, ex.args[2:end])...)
     else
@@ -67,7 +77,7 @@ function instantiate_generaltensor(dst, β, ex::Expr, α, leftind::Vector{Any}, 
         if istemporary
             initex = quote
                 $αsym = $α*$α2
-                $dst = cached_similar_from_indices($(QuoteNode(dst)), promote_type(eltype($src), typeof($αsym)), $p1, $p2, $src, $conjarg)
+                $dst = allocate_similar_from_indices($(QuoteNode(dst)), promote_type(eltype($src), typeof($αsym)), $p1, $p2, $src, $conjarg)
             end
         else
             initex = quote
@@ -167,6 +177,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
         conjA = :(:N)
         initA = Expr(:(=), symA, initA)
         αA = 1
+        Atemp = true;
     else
         A, indlA, indrA, αA, conj = decomposegeneraltensor(exA)
         indA = vcat(indlA, indrA)
@@ -175,6 +186,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
         TA = dst === nothing ? :(float(eltype($A))) : :(eltype($dst))
         conjA = conj ? :(:C) : :(:N)
         initA = Expr(:(=), symA, A)
+        Atemp = false;
     end
 
     if !isgeneraltensor(exB) || hastraceindices(exB)
@@ -184,6 +196,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
         conjB = :(:N)
         initB = Expr(:(=), symB, initB)
         αB = 1
+        Btemp = true;
     else
         B, indlB, indrB, αB, conj = decomposegeneraltensor(exB)
         indB = vcat(indlB, indrB)
@@ -191,6 +204,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
         pcB = (map(l->findfirst(isequal(l), indB), cind)...,)
         conjB = conj ? :(:C) : :(:N)
         initB = Expr(:(=), symB, B)
+        Btemp = false;
     end
 
     oindAB = vcat(oindA, oindB)
@@ -205,7 +219,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
     end
     if dst === nothing
         if istemporary
-            initC = :($symC = cached_similar_from_indices($(QuoteNode(symC)), $symTC, $poA, $poB, $p1, $p2, $symA, $symB, $conjA, $conjB))
+            initC = :($symC = allocate_similar_from_indices($(QuoteNode(symC)), $symTC, $poA, $poB, $p1, $p2, $symA, $symB, $conjA, $conjB))
         else
             initC = :($symC = similar_from_indices($symTC, $poA, $poB, $p1, $p2, $symA, $symB, $conjA, $conjB))
         end
@@ -213,14 +227,34 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
         initC = :($symC = $dst)
     end
 
-    return quote
+    symres = gensym();
+
+    toret = quote
         $symTC = $TC
         $initA
         $initB
         $initC
-        contract!($α*$αA*$αB, $symA, $conjA, $symB, $conjB, $β, $symC,
+        $(symres) = contract!($α*$αA*$αB, $symA, $conjA, $symB, $conjB, $β, $symC,
                     $poA, $pcA, $poB, $pcB, $p1, $p2,
                     $((gensym(),gensym(),gensym())))
-        # $symC
+    end
+
+    if Atemp
+        toret = quote
+            $(toret)
+            deallocate!($symA)
+        end
+    end
+
+    if Btemp
+        toret = quote
+            $(toret)
+            deallocate!($symB)
+        end
+    end
+
+    return quote
+        $(toret)
+        $(symres)
     end
 end

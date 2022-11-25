@@ -110,11 +110,21 @@ function tensorify(ex::Expr)
                     return Expr(:(=), dst,instantiate(dst, true, rhs, -1, leftind, rightind))
                 end
             else
-                return Expr(:(=), dst, instantiate(nothing, false, rhs, true, leftind, rightind, false))
+                return Expr(:(=), dst, instantiate(nothing, false, rhs, true, leftind, rightind))
             end
         elseif isassignment(ex) && isscalarexpr(lhs)
             if istensorexpr(rhs) && isempty(getindices(rhs))
-                return Expr(ex.head, instantiate_scalar(lhs), Expr(:call, :scalar, instantiate(nothing, false, rhs, true, [], [], true)))
+                
+                tempvar = gensym();
+                retvar = gensym();
+                scal_expr = quote
+                    $(tempvar) = instantiate(nothing, false, $(rhs), true, [], [], true);
+                    $(retvar) = scalar(tempvar);
+                    deallocate!($(tempvar))
+                    $(retvar)
+                end
+                
+                return Expr(ex.head, instantiate_scalar(lhs), scal_expr)
             elseif isscalarexpr(rhs)
                 return Expr(ex.head, instantiate_scalar(lhs), instantiate_scalar(rhs))
             end
@@ -140,7 +150,14 @@ function tensorify(ex::Expr)
             err = "cannot evaluate $ex to a scalar: uncontracted indices"
             return :(throw(IndexError($err)))
         end
-        return Expr(:call, :scalar, instantiate(nothing, false, ex, true, [], [], true))
+        tempvar = gensym();
+        retvar = gensym();
+        return quote
+            $(tempvar) = instantiate(nothing, false, $(ex), true, [], [], true);
+            $(retvar) = scalar(tempvar);
+            deallocate!($(tempvar))
+            $(retvar)
+        end
     end
     error("invalid syntax in @tensor macro: $ex")
 end
