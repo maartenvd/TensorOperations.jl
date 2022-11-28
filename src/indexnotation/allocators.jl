@@ -63,8 +63,11 @@ Return the current memory size (in bytes) of all the objects in the cache.
 """
 cachesize() = cache.currentsize
 
+allocate_similar_from_indices(args...) = allocate_similar_from_indices(current_strategy(),args...)
 allocate_similar_from_indices(strategy::Cached_Temporaries, args...) = cached_similar_from_indices(args...)
 allocate_similar_from_indices(strategy::Julia_Managed_Temporaries, args...) = similar_from_indices(args...)
+
+deallocate!(var) = deallocate!(current_strategy(),var);
 function deallocate!(strategy::Julia_Managed_Temporaries,var) end;
 
 function deallocate!(strategy::Cached_Temporaries,var)

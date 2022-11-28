@@ -5,7 +5,7 @@ memsize(A::Array) = sizeof(A)
 memsize(A::AbstractArray) = memsize(parent(A))
 
 """
-    contract!(α, A, conjA, B, conjB, β, C, oindA, cindA, oindB, cindB, indleft, indright, syms = nothing)
+    contract!(α, A, conjA, B, conjB, β, C, oindA, cindA, oindB, cindB, indleft, indright)
 
 Implements `C = β*C+α*contract(opA(A),opB(B))` where `A` and `B` are contracted, such that
 the indices `cindA` of `A` are contracted with indices `cindB` of `B`. The open indices
@@ -276,7 +276,7 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
         else
         
             cleanup_A2 = true;
-            A2 = allocate_similar_from_indices(current_strategy(), TC, oindA, cindA, A, CA)
+            A2 = allocate_similar_from_indices( TC, oindA, cindA, A, CA)
             
             add!(1, A, CA, 0, A2, oindA, cindA)
             CA2 = :N
@@ -289,7 +289,7 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
         else
             
             cleanup_B2 = true;
-            B2 = allocate_similar_from_indices(current_strategy(), TC, cindB, oindB, B, CB)
+            B2 = allocate_similar_from_indices(TC, cindB, oindB, B, CB)
             add!(1, B, CB, 0, B2, cindB, oindB)
             CB2 = :N
             cindB = _trivtuple(cindB)
@@ -306,7 +306,7 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
         else
             
             cleanup_C2 = true;
-            C2 = allocate_similar_from_indices(current_strategy(), TC, oindAinC, oindBinC, C, :N)
+            C2 = allocate_similar_from_indices(TC, oindAinC, oindBinC, C, :N)
             _blas_contract!(1, A2, CA2, B2, CB2, 0, C2,
                                 oindA, cindA, oindB, cindB,
                                 _trivtuple(oindA), length(oindA) .+ _trivtuple(oindB),
@@ -315,9 +315,9 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
             add!(α, C2, :N, β, C, indCinoAB, ())
         end
 
-        cleanup_A2 && deallocate!(current_strategy(),A2)
-        cleanup_B2 && deallocate!(current_strategy(),B2)
-        cleanup_C2 && deallocate!(current_strategy(),C2)
+        cleanup_A2 && deallocate!(A2)
+        cleanup_B2 && deallocate!(B2)
+        cleanup_C2 && deallocate!(C2)
     else
         _native_contract!(α, A, CA, B, CB, β, C, oindA, cindA, oindB, cindB, indCinoAB,
                             osizeA, csizeA, osizeB, csizeB)

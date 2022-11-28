@@ -120,7 +120,7 @@ function tensorify(ex::Expr)
                 scal_expr = quote
                     $(tempvar) = instantiate(nothing, false, $(rhs), true, [], [], true);
                     $(retvar) = scalar(tempvar);
-                    deallocate!(current_strategy(),$(tempvar))
+                    deallocate!($(tempvar))
                     $(retvar)
                 end
                 
@@ -155,7 +155,7 @@ function tensorify(ex::Expr)
         return quote
             $(tempvar) = instantiate(nothing, false, $(ex), true, [], [], true);
             $(retvar) = scalar(tempvar);
-            deallocate!(current_strategy(),$(tempvar))
+            deallocate!($(tempvar))
             $(retvar)
         end
     end
