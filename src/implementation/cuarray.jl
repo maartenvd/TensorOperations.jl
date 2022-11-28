@@ -137,7 +137,7 @@ function contract!(α, A::CuArray, CA::Symbol,
                     β, C::CuArray,
                     oindA::IndexTuple, cindA::IndexTuple,
                     oindB::IndexTuple, cindB::IndexTuple,
-                    indCinoAB::IndexTuple, syms::Union{Nothing, NTuple{3,Symbol}} = nothing)
+                    indCinoAB::IndexTuple)
 
     pA = (oindA...,cindA...)
     (length(pA) == ndims(A) && isperm(pA)) ||

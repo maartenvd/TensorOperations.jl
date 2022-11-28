@@ -7,7 +7,7 @@ using LinearAlgebra
 using LinearAlgebra: mul!, BLAS.BlasFloat
 using LRUCache
 using Requires
-
+using Recyclers
 # Exports
 #---------
 # export macro API

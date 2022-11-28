@@ -1,5 +1,5 @@
 """
-    ncon(tensorlist, indexlist, [conjlist, sym]; order = ..., output = ...)
+    ncon(tensorlist, indexlist, [conjlist]; order = ..., output = ...)
 
 Contract the tensors in `tensorlist` (of type `Vector` or `Tuple`) according to the network
 as specified by `indexlist`. Here, `indexlist` is a list (i.e. a `Vector` or `Tuple`) with
@@ -12,9 +12,7 @@ should appear only once.
 
 Optional arguments in another list with the same length, `conjlist`, whose entries are of
 type `Bool` and indicate whether the corresponding tensor object should be conjugated
-(`true`) or not (`false`). Finally, a `Symbol` can be provided which provides a hook into
-the global LRU cache of TensorOperations.jl to store temporaries. This symbol should be
-unique for every `ncon` call withing a running application.
+(`true`) or not (`false`). 
 
 By default, contractions are performed in the order such that the indices being contracted
 over are labelled by increasing integers, i.e. first the contraction corresponding to label
@@ -25,7 +23,7 @@ over are labelled by increasing integers, i.e. first the contraction correspondi
 See also the macro version [`@ncon`](@ref).
 """
 function ncon(tensors, network,
-                conjlist = fill(false, length(tensors)), sym = nothing ;
+                conjlist = fill(false, length(tensors));
                 order = nothing, output = nothing)
     length(tensors) >= 2 ||
         throw(ArgumentError("do not use `ncon` for less than two tensors"))
@@ -55,60 +53,39 @@ function ncon(tensors, network,
     (tensors,network) = resolve_traces(tensors,network);
     tree = order === nothing ? ncontree(network) : indexordertree(network, order)
 
-    if sym !== nothing
-        syma = Symbol(sym, "_a")
-        symb = Symbol(sym, "_b")
-    else
-        syma = symb = nothing
-    end
-    A, IA, CA = contracttree(tensors, network, conjlist, tree[1], syma)
-    B, IB, CB = contracttree(tensors, network, conjlist, tree[2], symb)
+    A, IA, CA, AT = contracttree(tensors, network, conjlist, tree[1])
+    B, IB, CB, BT = contracttree(tensors, network, conjlist, tree[2])
     IC = tuple(output...)
 
     oindA, cindA, oindB, cindB, indCinoAB = contract_indices(IA, IB, IC)
     T = promote_type(eltype(A), eltype(B))
-    # end result: don't use cache
+    
     C = similar_from_indices(T, oindA, oindB, indCinoAB, (), A, B, CA, CB)
-    if sym !== nothing
-        symcontract = (Symbol(sym, "_a′"), Symbol(sym, "_b′"), Symbol(sym, "_c′"))
-    else
-        symcontract = nothing
-    end
     contract!(true, A, CA, B, CB, false, C,
-                oindA, cindA, oindB, cindB, indCinoAB, (), symcontract)
+                oindA, cindA, oindB, cindB, indCinoAB, ())
+
+    AT && deallocate!(current_strategy,A);
+    BT && deallocate!(current_strategy,B);
     return C
 end
 
-function contracttree(tensors, network, conjlist, tree, sym)
+function contracttree(tensors, network, conjlist, tree)
     @nospecialize
     if tree isa Int
-        return tensors[tree], tuple(network[tree]...), (conjlist[tree] ? :C : :N)
+        return tensors[tree], tuple(network[tree]...), (conjlist[tree] ? :C : :N), false
     end
 
-    if sym !== nothing
-        syma = Symbol(sym, "_a")
-        symb = Symbol(sym, "_b")
-    else
-        syma = nothing
-        symb = nothing
-    end
-    A, IA, CA = contracttree(tensors, network, conjlist, tree[1], syma)
-    B, IB, CB = contracttree(tensors, network, conjlist, tree[2], symb)
+    A, IA, CA, AT = contracttree(tensors, network, conjlist, tree[1])
+    B, IB, CB, BT = contracttree(tensors, network, conjlist, tree[2])
     IC = tuple(symdiff(IA, IB)...)
     oindA, cindA, oindB, cindB, indCinoAB = contract_indices(IA, IB, IC)
     T = promote_type(eltype(A), eltype(B))
-    if sym !== nothing
-        symc = Symbol(sym, "_c")
-        C = cached_similar_from_indices(symc, T, oindA, oindB, indCinoAB, (), A, B, CA, CB)
-    else
-        C = similar_from_indices(T, oindA, oindB, indCinoAB, (), A, B, CA, CB)
-    end
-    if sym !== nothing
-        symcontract = (Symbol(sym, "_a′"), Symbol(sym, "_b′"), Symbol(sym, "_c′"))
-    else
-        symcontract = nothing
-    end
+    
+    C = allocate_similar_from_indices(current_strategy(), T, oindA, oindB, indCinoAB, (), A, B, CA, CB)
     contract!(true, A, CA, B, CB, false, C,
-                oindA, cindA, oindB, cindB, indCinoAB, (), symcontract)
-    return C, IC, :N
+                oindA, cindA, oindB, cindB, indCinoAB, ())
+
+    AT && deallocate!(current_strategy(),A);
+    BT && deallocate!(current_strategy(),B)
+    return C, IC, :N, true
 end

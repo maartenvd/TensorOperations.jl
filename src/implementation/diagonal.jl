@@ -21,7 +21,7 @@ end
 function contract!(α, A::AbstractArray, CA::Symbol, B::Diagonal, CB::Symbol,
         β, C::AbstractArray,
         oindA::IndexTuple, cindA::IndexTuple, oindB::IndexTuple, cindB::IndexTuple,
-        indCinoAB::IndexTuple, syms::Union{Nothing, NTuple{3,Symbol}} = nothing)
+        indCinoAB::IndexTuple)
 
     pA = (oindA...,cindA...)
     (length(pA) == ndims(A) && TupleTools.isperm(pA)) ||
@@ -152,7 +152,7 @@ end
 function contract!(α, A::Diagonal, CA::Symbol, B::AbstractArray, CB::Symbol,
         β, C::AbstractArray,
         oindA::IndexTuple, cindA::IndexTuple, oindB::IndexTuple, cindB::IndexTuple,
-        indCinoAB::IndexTuple, syms::Union{Nothing, NTuple{3,Symbol}} = nothing)
+        indCinoAB::IndexTuple)
 
     indCinoAB′ = map(i->i <= length(oindA) ? length(oindB)+i : i-length(oindA), indCinoAB)
     contract!(α, B, CB, A, CA, β, C, oindB, cindB, oindA, cindA, indCinoAB′)

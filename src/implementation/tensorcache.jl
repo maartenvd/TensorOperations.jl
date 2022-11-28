@@ -38,35 +38,28 @@ function similartype_from_indices(T::Type, poA, poB, p1, p2, A, B, CA, CB)
 end
 
 # generic, should probably not be overwritten
-function cached_similar_from_indices(sym::Symbol, T::Type,
+function cached_similar_from_indices(T::Type,
                                         p1::IndexTuple, p2::IndexTuple,
                                         A, CA::Symbol)
-    if use_cache()
-        structure = similarstructure_from_indices(T, p1, p2, A, CA)
-        typ = similartype_from_indices(T, p1, p2, A, CA)
-        key = (sym, taskid(), typ, structure)
-        C::typ = get!(cache, key) do
-            similar_from_indices(T, p1, p2, A, CA)
-        end
-        return C
-    else
-        return similar_from_indices(T, p1, p2, A, CA)
+    
+    structure = similarstructure_from_indices(T, p1, p2, A, CA)
+    typ = similartype_from_indices(T, p1, p2, A, CA)
+    key = (typ, structure)
+    recy = get!(cache, key) do
+        Recyclers.CentralizedRecycler(() -> similar_from_indices(T, p1, p2, A, CA));
     end
+    Recyclers.get!(recy)::typ
 end
-function cached_similar_from_indices(sym::Symbol, T::Type,
+function cached_similar_from_indices(T::Type,
                                         poA::IndexTuple, poB::IndexTuple,
                                         p1::IndexTuple, p2::IndexTuple,
                                         A, B, CA::Symbol, CB::Symbol)
 
-    if use_cache()
-        structure = similarstructure_from_indices(T, poA, poB, p1, p2, A, B, CA, CB)
-        typ = similartype_from_indices(T, poA, poB, p1, p2, A, B, CA, CB)
-        key = (sym, taskid(), typ, structure)
-        C::typ = get!(cache, key) do
-            similar_from_indices(T, poA, poB, p1, p2, A, B, CA, CB)
-        end
-        return C
-    else
-        return similar_from_indices(T, poA, poB, p1, p2, A, B, CA, CB)
+    structure = similarstructure_from_indices(T, poA, poB, p1, p2, A, B, CA, CB)
+    typ = similartype_from_indices(T, poA, poB, p1, p2, A, B, CA, CB)
+    key = (typ, structure)
+    recy = get!(cache, key) do
+        Recyclers.CentralizedRecycler(() -> similar_from_indices(T, poA, poB, p1, p2, A, B, CA, CB));
     end
+    Recyclers.get!(recy)::typ
 end

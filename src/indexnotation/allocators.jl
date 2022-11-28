@@ -63,6 +63,11 @@ Return the current memory size (in bytes) of all the objects in the cache.
 """
 cachesize() = cache.currentsize
 
-allocate_similar_from_indices(strategy::Cached_Temporaries,sym::Symbol, args...) = cached_similar_from_indices(sym, args...)
-allocate_similar_from_indices(strategy::Julia_Managed_Temporaries,sym::Symbol, args...) = similar_from_indices(args...)
-function deallocate!(strategy::Union{Cached_Temporaries,Julia_Managed_Temporaries},var) end;
+allocate_similar_from_indices(strategy::Cached_Temporaries, args...) = cached_similar_from_indices(args...)
+allocate_similar_from_indices(strategy::Julia_Managed_Temporaries, args...) = similar_from_indices(args...)
+function deallocate!(strategy::Julia_Managed_Temporaries,var) end;
+
+function deallocate!(strategy::Cached_Temporaries,var)
+    recy = cache[(typeof(var),structure(var))];
+    Recyclers.recycle!(recy,var);
+end

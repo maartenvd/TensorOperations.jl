@@ -5,6 +5,28 @@ memsize(A::Array) = sizeof(A)
 memsize(A::AbstractArray) = memsize(parent(A))
 
 """
+    contract!(α, A, conjA, B, conjB, β, C, oindA, cindA, oindB, cindB, indleft, indright, syms = nothing)
+
+Implements `C = β*C+α*contract(opA(A),opB(B))` where `A` and `B` are contracted, such that
+the indices `cindA` of `A` are contracted with indices `cindB` of `B`. The open indices
+`oindA` of `A` and `oindB` of `B` are permuted such that `C` has left (right) indices
+corresponding to indices `indleft` (`indright`) out of `(oindA..., oindB...)`. The
+operation `opA` (`opB`) acts as `conj` if `conjA` (`conjB`) equal `:C` or as the identity
+map if `conjA` (`conjB`) equal `:N`. Together, `(oindA..., cindA...)` is a permutation of
+1 to the number of indices of `A` and `(oindB..., cindB...)` is a permutation of 1 to the
+number of indices of `C`. Furthermore, `length(cindA) == length(cindB)`,
+`length(oindA)+length(oindB)` equals the number of indices of `C` and `(indleft...,
+indright...)` is a permutation of `1` ot the number of indices of `C`.
+"""
+
+contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbol,
+        β, C::AbstractArray,
+        oindA::IndexTuple, cindA::IndexTuple, oindB::IndexTuple, cindB::IndexTuple,
+        indleft::IndexTuple,indright::IndexTuple) = contract!(α, A, CA, B, CB, β, C, oindA, cindA, oindB, cindB, (indleft...,indright...));
+
+structure(A::AbstractArray) = size(A);
+
+"""
     similarstructure_from_indices(T, indleft, indright, A, conjA = :N)
 
 Returns the structure of an object similar to `A` (e.g. `size` for `AbstractArray` objects)
@@ -65,30 +87,6 @@ of `A`, and indices `cindA1` are contracted with indices `cindA2`. Furthermore, 
 trace!(α, A::AbstractArray, CA::Symbol, β, C::AbstractArray, indleft::IndexTuple,
         indright::IndexTuple, cind1::IndexTuple, cind2::IndexTuple) =
     trace!(α, A, CA, β, C, (indleft..., indright...), cind1, cind2)
-
-"""
-    contract!(α, A, conjA, B, conjB, β, C, oindA, cindA, oindB, cindB, indleft, indright, syms = nothing)
-
-Implements `C = β*C+α*contract(opA(A),opB(B))` where `A` and `B` are contracted, such that
-the indices `cindA` of `A` are contracted with indices `cindB` of `B`. The open indices
-`oindA` of `A` and `oindB` of `B` are permuted such that `C` has left (right) indices
-corresponding to indices `indleft` (`indright`) out of `(oindA..., oindB...)`. The
-operation `opA` (`opB`) acts as `conj` if `conjA` (`conjB`) equal `:C` or as the identity
-map if `conjA` (`conjB`) equal `:N`. Together, `(oindA..., cindA...)` is a permutation of
-1 to the number of indices of `A` and `(oindB..., cindB...)` is a permutation of 1 to the
-number of indices of `C`. Furthermore, `length(cindA) == length(cindB)`,
-`length(oindA)+length(oindB)` equals the number of indices of `C` and `(indleft...,
-indright...)` is a permutation of `1` ot the number of indices of `C`.
-
-The final argument `syms` is optional and can be either `nothing`, or a tuple of three
-symbols, which are used to identify temporary objects in the cache to be used for permuting
-`A`, `B` and `C` so as to perform the contraction as a matrix multiplication.
-"""
-contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbol,
-        β, C::AbstractArray, oindA::IndexTuple, cindA::IndexTuple, oindB::IndexTuple,
-        cindB::IndexTuple, indleft::IndexTuple, indright::IndexTuple, syms = nothing) =
-    contract!(α, A, CA, B, CB, β, C,
-                oindA, cindA, oindB, cindB, (indleft..., indright...), syms)
 
 # actual implementations for AbstractArray with ind = (indleft..., indright...)
 _similarstructure_from_indices(T, ind, A::AbstractArray) = map(n->size(A, n), ind)
@@ -215,7 +213,7 @@ end
 function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbol,
         β, C::AbstractArray,
         oindA::IndexTuple, cindA::IndexTuple, oindB::IndexTuple, cindB::IndexTuple,
-        indCinoAB::IndexTuple, syms::Union{Nothing, NTuple{3,Symbol}} = nothing)
+        indCinoAB::IndexTuple)
 
     TC = eltype(C)
     ipC = TupleTools.invperm(indCinoAB)
@@ -239,7 +237,7 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
                 map(n->ifelse(n>N₁, n-N₁, n+N₂), indCinoAB)
             end
             return contract!(α, B, CB, A, CA, β, C,
-                                oindB, cindB, oindA, cindA, indCinoBA, syms)
+                                oindB, cindB, oindA, cindA, indCinoBA)
         end
     end
 
@@ -276,12 +274,10 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
             A2 = A
             CA2 = CA
         else
-            if syms === nothing
-                A2 = similar_from_indices(TC, oindA, cindA, A, CA)
-            else
-                cleanup_A2 = true;
-                A2 = allocate_similar_from_indices(current_strategy(),syms[1], TC, oindA, cindA, A, CA)
-            end
+        
+            cleanup_A2 = true;
+            A2 = allocate_similar_from_indices(current_strategy(), TC, oindA, cindA, A, CA)
+            
             add!(1, A, CA, 0, A2, oindA, cindA)
             CA2 = :N
             oindA = _trivtuple(oindA)
@@ -291,12 +287,9 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
             B2 = B
             CB2 = CB
         else
-            if syms === nothing
-                B2 = similar_from_indices(TC, cindB, oindB, B, CB)
-            else
-                cleanup_B2 = true;
-                B2 = allocate_similar_from_indices(current_strategy(),syms[2], TC, cindB, oindB, B, CB)
-            end
+            
+            cleanup_B2 = true;
+            B2 = allocate_similar_from_indices(current_strategy(), TC, cindB, oindB, B, CB)
             add!(1, B, CB, 0, B2, cindB, oindB)
             CB2 = :N
             cindB = _trivtuple(cindB)
@@ -311,12 +304,9 @@ function contract!(α, A::AbstractArray, CA::Symbol, B::AbstractArray, CB::Symbo
                                 oindA, cindA, oindB, cindB, oindAinC, oindBinC,
                                 osizeA, csizeA, osizeB, csizeB)
         else
-            if syms === nothing
-                C2 = similar_from_indices(TC, oindAinC, oindBinC, C, :N)
-            else
-                cleanup_C2 = true;
-                C2 = allocate_similar_from_indices(current_strategy(),syms[3], TC, oindAinC, oindBinC, C, :N)
-            end
+            
+            cleanup_C2 = true;
+            C2 = allocate_similar_from_indices(current_strategy(), TC, oindAinC, oindBinC, C, :N)
             _blas_contract!(1, A2, CA2, B2, CB2, 0, C2,
                                 oindA, cindA, oindB, cindB,
                                 _trivtuple(oindA), length(oindA) .+ _trivtuple(oindB),

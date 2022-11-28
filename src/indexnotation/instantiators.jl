@@ -77,7 +77,7 @@ function instantiate_generaltensor(dst, β, ex::Expr, α, leftind::Vector{Any}, 
         if istemporary
             initex = quote
                 $αsym = $α*$α2
-                $dst = allocate_similar_from_indices(current_strategy(),$(QuoteNode(dst)), promote_type(eltype($src), typeof($αsym)), $p1, $p2, $src, $conjarg)
+                $dst = allocate_similar_from_indices(current_strategy(),promote_type(eltype($src), typeof($αsym)), $p1, $p2, $src, $conjarg)
             end
         else
             initex = quote
@@ -219,7 +219,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
     end
     if dst === nothing
         if istemporary
-            initC = :($symC = allocate_similar_from_indices(current_strategy(),$(QuoteNode(symC)), $symTC, $poA, $poB, $p1, $p2, $symA, $symB, $conjA, $conjB))
+            initC = :($symC = allocate_similar_from_indices(current_strategy(), $symTC, $poA, $poB, $p1, $p2, $symA, $symB, $conjA, $conjB))
         else
             initC = :($symC = similar_from_indices($symTC, $poA, $poB, $p1, $p2, $symA, $symB, $conjA, $conjB))
         end
@@ -235,8 +235,7 @@ function instantiate_contraction(dst, β, ex::Expr, α, leftind::Vector{Any}, ri
         $initB
         $initC
         $(symres) = contract!($α*$αA*$αB, $symA, $conjA, $symB, $conjB, $β, $symC,
-                    $poA, $pcA, $poB, $pcB, $p1, $p2,
-                    $((gensym(),gensym(),gensym())))
+                    $poA, $pcA, $poB, $pcB, $p1, $p2)
     end
 
     if Atemp
