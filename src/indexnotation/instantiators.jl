@@ -26,9 +26,10 @@ function instantiate_scalar(ex::Expr)
         
         tempvar = gensym();
         retvar = gensym();
+        instantiated = instantiate(nothing, 0, ex.args[2], 1, [], [], true);
         return quote
-            $(tempvar) = instantiate(nothing, 0, $(ex.args[2]), 1, [], [], true);
-            $(retvar) = scalar(tempvar);
+            $(tempvar) = $(instantiated)
+            $(retvar) = scalar($tempvar);
             deallocate!($(tempvar))
             $(retvar)
         end

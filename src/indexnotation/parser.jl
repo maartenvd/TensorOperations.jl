@@ -117,9 +117,10 @@ function tensorify(ex::Expr)
                 
                 tempvar = gensym();
                 retvar = gensym();
+                instantiated = instantiate(nothing, false, rhs, true, [], [], true);
                 scal_expr = quote
-                    $(tempvar) = instantiate(nothing, false, $(rhs), true, [], [], true);
-                    $(retvar) = scalar(tempvar);
+                    $(tempvar) = $(instantiated)
+                    $(retvar) = scalar($tempvar);
                     deallocate!($(tempvar))
                     $(retvar)
                 end
@@ -152,9 +153,10 @@ function tensorify(ex::Expr)
         end
         tempvar = gensym();
         retvar = gensym();
+        instantiated = instantiate(nothing, false, ex, true, [], [], true);
         return quote
-            $(tempvar) = instantiate(nothing, false, $(ex), true, [], [], true);
-            $(retvar) = scalar(tempvar);
+            $(tempvar) = $(instantiated)
+            $(retvar) = scalar($tempvar);
             deallocate!($(tempvar))
             $(retvar)
         end
